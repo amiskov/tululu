@@ -1,9 +1,11 @@
-from pathlib import Path
+import os
 import logging
-from pathvalidate import sanitize_filename
+from pathlib import Path
+from urllib.parse import urlsplit, unquote
 
 import requests
 from bs4 import BeautifulSoup
+from pathvalidate import sanitize_filename
 
 
 def main():
@@ -13,8 +15,16 @@ def main():
         resp.raise_for_status()
         try:
             soup = BeautifulSoup(resp.text, 'lxml')
-            h1 = soup.find('div', {'id': 'content'}).find('h1').text
+            content = soup.find('div', {'id': 'content'})
+
+            h1 = content.find('h1').text
             title, author = [part.strip() for part in h1.split('::')]
+
+            img_path = content.find('table', class_='d_book').find(
+                'div', class_='bookimage').find('img')['src']
+            img_url = f'https://tululu.org{img_path}'
+            download_image(img_url, 'images/')
+
         except Exception as e:
             logging.error(
                 f'Failed to find title and author for {book_id}: {e}')
@@ -31,6 +41,25 @@ def main():
 def check_for_redirect(resp: requests.Response):
     if resp.history and 'txt.php?id=' not in resp.url:
         raise requests.HTTPError('Bad book URL.')
+
+
+def download_image(url: str, folder: str) -> str:
+    response = requests.get(url)
+    response.raise_for_status()
+    check_for_redirect(response)
+
+    url_path = urlsplit(url).path
+    _, filename = os.path.split(unquote(url_path))
+
+    images_dir = Path(folder)
+    images_dir.mkdir(exist_ok=True)
+
+    image_file = images_dir.joinpath(filename)
+
+    with open(image_file, 'wb') as file:
+        file.write(response.content)
+    logging.info(f'{filename} has been saved.')
+    return str(image_file)
 
 
 def download_txt(url: str, filename: str, folder='books/') -> str:
