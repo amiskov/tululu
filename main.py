@@ -17,6 +17,11 @@ def main():
             soup = BeautifulSoup(resp.text, 'lxml')
             content = soup.find('div', {'id': 'content'})
 
+            comments = []
+            comment_tags = content.find_all('div', class_='texts')
+            for tag in comment_tags:
+                comments.append(tag.find('span', class_='black').text)
+
             h1 = content.find('h1').text
             title, author = [part.strip() for part in h1.split('::')]
 
