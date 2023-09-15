@@ -3,13 +3,26 @@ import logging
 from pathvalidate import sanitize_filename
 
 import requests
+from bs4 import BeautifulSoup
 
 
 def main():
     for book_id in range(1, 11):
+        # get title & author
+        resp = requests.get(f'https://tululu.org/b{book_id}/')
+        resp.raise_for_status()
+        try:
+            soup = BeautifulSoup(resp.text, 'lxml')
+            h1 = soup.find('div', {'id': 'content'}).find('h1').text
+            title, author = [part.strip() for part in h1.split('::')]
+        except Exception as e:
+            logging.error(
+                f'Failed to find title and author for {book_id}: {e}')
+            continue
+
         url = f'https://tululu.org/txt.php?id={book_id}'
         try:
-            download_txt(url, 'books', book_id)
+            download_txt(url, f'{book_id}. {title}', 'books')
         except requests.HTTPError as e:
             logging.error(e)
             continue
