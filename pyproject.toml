@@ -9,7 +9,13 @@ packages = [{include = "books_library_restyle"}]
 [tool.poetry.dependencies]
 python = "^3.11"
 requests = "^2.31.0"
+beautifulsoup4 = "^4.12.2"
+lxml = "^4.9.3"
+pathvalidate = "^3.1.0"
 
+
+[tool.poetry.group.dev.dependencies]
+ipython = "^8.15.0"
 
 [build-system]
 requires = ["poetry-core"]
