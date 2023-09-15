@@ -17,6 +17,11 @@ def main():
             soup = BeautifulSoup(resp.text, 'lxml')
             content = soup.find('div', {'id': 'content'})
 
+            genres = []
+            genre_tags = content.find('span', class_='d_book').find_all('a')
+            for tag in genre_tags:
+                genres.append(tag.text)
+
             comments = []
             comment_tags = content.find_all('div', class_='texts')
             for tag in comment_tags:
