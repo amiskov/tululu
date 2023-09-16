@@ -1,5 +1,6 @@
 import os
 import logging
+import argparse
 from pathlib import Path
 from urllib.parse import urlsplit, unquote
 
@@ -7,32 +8,62 @@ import requests
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
-logging.basicConfig(level=logging.INFO)
-
 
 def main():
-    for book_id in range(1, 11):
-        txt_url = f'https://tululu.org/txt.php?id={book_id}'
-        page_url = f'https://tululu.org/b{book_id}/'
+    logging.basicConfig(level=logging.INFO)
+    args = parse_args()
+
+    logging.info(f'Downloading books from {args.start_id} to {args.end_id}...')
+
+    for book_id in range(args.start_id, args.end_id+1):
+        page_url, txt_url = get_book_urls(book_id)
 
         try:
-            resp = requests.get(page_url)
-            resp.raise_for_status()
-            check_for_redirect(resp)
-            book_details = parse_book_page(resp.text)
-
-            saved_book_path = download_txt(
-                txt_url, f'{book_id}. {book_details["title"]}', 'books')
-            logging.info(f'{saved_book_path} has been saved.')
-
+            book_page_html = make_request(page_url).text
+            book_details = parse_book_page(book_page_html)
+            saved_book = download_txt(txt_url,
+                                      f'{book_id}. {book_details["title"]}',
+                                      'books/')
             saved_img = download_image(book_details['cover_url'], 'images/')
-            logging.info(f'{saved_img} has been saved.')
-        except requests.HTTPError as e:
+            logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
+        except requests.RequestException as e:
             logging.error(e)
+        finally:
             continue
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(prog='Books Downloader')
+    parser.add_argument('start_id', type=int, nargs='?', default=1)
+    parser.add_argument('end_id', type=int, nargs='?', default=10)
+    return parser.parse_args()
+
+
+def make_request(url: str) -> requests.Response:
+    """Return response of the request to the given `url`.
+
+    Fails if redirect happens.
+    """
+    resp = requests.get(url, allow_redirects=False)
+    resp.raise_for_status()
+
+    # former `check_for_redirect` function
+    if 300 <= resp.status_code < 400:
+        raise requests.HTTPError('Redirects not allowed.')
+
+    return resp
+
+
+def get_book_urls(book_id: int) -> tuple[str, str]:
+    """Return 2 urls: book description page and downloadable txt."""
+    host = 'https://tululu.org'
+    txt_url = f'{host}/txt.php?id={book_id}'
+    page_url = f'{host}/b{book_id}/'
+    return page_url, txt_url
+
+
 def parse_book_page(page_html: str) -> dict:
+    """Extract book details from HTML soup."""
     soup = BeautifulSoup(page_html, 'lxml')
     content = soup.find('div', {'id': 'content'})
 
@@ -61,63 +92,59 @@ def parse_book_page(page_html: str) -> dict:
     }
 
 
-def check_for_redirect(resp: requests.Response):
-    if resp.history:
-        raise requests.HTTPError('Redirect: initial URL has been changed.')
+def get_filename_from_url(url: str) -> str:
+    """Return filename with extension from `url`.
+
+    >>> get_filename_from_url('https://example.com/images/test.png')
+    'test.png'
+    """
+    url_path = urlsplit(url).path
+    _, filename = os.path.split(unquote(url_path))
+    return filename
 
 
 def download_image(url: str, folder: str) -> str:
-    response = requests.get(url)
-    response.raise_for_status()
-    check_for_redirect(response)
-
-    url_path = urlsplit(url).path
-    _, filename = os.path.split(unquote(url_path))
-
-    images_dir = Path(folder)
-    images_dir.mkdir(exist_ok=True)
-
-    image_file = images_dir.joinpath(filename)
-
+    """Save an image from `url` to the given `folder`."""
+    resp = make_request(url)
+    image_file = get_filepath(get_filename_from_url(url), folder)
     with open(image_file, 'wb') as file:
-        file.write(response.content)
+        file.write(resp.content)
     return str(image_file)
 
 
+def get_filepath(filename: str, foldername: str) -> Path:
+    folder = Path(foldername)
+    folder.mkdir(exist_ok=True)
+    return folder.joinpath(filename)
+
+
 def download_txt(url: str, filename: str, folder='books/') -> str:
-    """Функция для скачивания текстовых файлов.
+    """Download text content from the given `url`.
 
     Args:
-        url (str): Cсылка на текст, который хочется скачать.
-        filename (str): Имя файла, с которым сохранять.
-        folder (str): Папка, куда сохранять.
+        url (str): link to text cntent.
+        filename (str): name of the file to store the text.
+        folder (str): desired directory name to store the file with text.
 
     Returns:
-        str: Путь до файла, куда сохранён текст.
+        str: path to created text file.
 
     Examples:
         url = 'http://tululu.org/txt.php?id=1'
 
-        filepath = download_txt(url, 'Алиби')
-        print(filepath)  # Выведется books/Алиби.txt
+        > download_txt(url, 'Алиби')
+        'books/Алиби.txt'
 
-        filepath = download_txt(url, 'Али/би', folder='books/')
-        print(filepath)  # Выведется books/Алиби.txt
+        > download_txt(url, 'Али/би', folder='books/')
+        'books/Алиби.txt'
 
-        filepath = download_txt(url, 'Али\\би', folder='txt/')
-        print(filepath)  # Выведется txt/Алиби.txt
+        > download_txt(url, 'Али\\би', folder='txt/')
+        'txt/Алиби.txt'
     """
-    response = requests.get(url)
-    response.raise_for_status()
-    check_for_redirect(response)
-
-    books_dir = Path(folder)
-    books_dir.mkdir(exist_ok=True)
-
-    book_file = books_dir.joinpath(sanitize_filename(filename + '.txt'))
-
+    resp = make_request(url)
+    book_file = get_filepath(sanitize_filename(filename + '.txt'), folder)
     with open(book_file, 'wb') as file:
-        file.write(response.content)
+        file.write(resp.content)
     return str(book_file)
 
 
