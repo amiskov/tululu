@@ -1,8 +1,8 @@
-import os
-import logging
 import argparse
+import logging
+import os
 from pathlib import Path
-from urllib.parse import urlsplit, unquote
+from urllib.parse import unquote, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,8 +13,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     args = parse_args()
 
-    logging.info(f'Downloading books from {args.start_id} to {args.end_id}...')
-
+    books_count, saved_books_count = args.end_id - args.start_id + 1, 0
     for book_id in range(args.start_id, args.end_id+1):
         page_url, txt_url = get_book_urls(book_id)
 
@@ -26,10 +25,12 @@ def main():
                                       'books/')
             saved_img = download_image(book_details['cover_url'], 'images/')
             logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
+            saved_books_count += 1
         except requests.RequestException as e:
             logging.error(e)
         finally:
             continue
+    logging.info(f'Done! Books saved: {saved_books_count} of {books_count}.')
 
 
 def parse_args():
@@ -103,22 +104,14 @@ def get_filename_from_url(url: str) -> str:
     return filename
 
 
-def download_image(url: str, folder: str) -> str:
+def download_image(url: str, folder: str) -> Path:
     """Save an image from `url` to the given `folder`."""
-    resp = make_request(url)
-    image_file = get_filepath(get_filename_from_url(url), folder)
-    with open(image_file, 'wb') as file:
-        file.write(resp.content)
-    return str(image_file)
+    image_name = get_filename_from_url(url)
+    image_file = get_filepath(image_name, folder)
+    return download_to_file(url, image_file)
 
 
-def get_filepath(filename: str, foldername: str) -> Path:
-    folder = Path(foldername)
-    folder.mkdir(exist_ok=True)
-    return folder.joinpath(filename)
-
-
-def download_txt(url: str, filename: str, folder='books/') -> str:
+def download_txt(url: str, filename: str, folder='books/') -> Path:
     """Download text content from the given `url`.
 
     Args:
@@ -141,11 +134,27 @@ def download_txt(url: str, filename: str, folder='books/') -> str:
         > download_txt(url, 'Али\\би', folder='txt/')
         'txt/Алиби.txt'
     """
+    correct_filename = sanitize_filename(filename + '.txt')
+    book_file = get_filepath(correct_filename, folder)
+    return download_to_file(url, book_file)
+
+
+def download_to_file(url: str, filepath: Path) -> Path:
+    """Save resource from `url` as a file to `filepath`.
+    
+    Returns:
+        filepath (Path): path to file with content from `url`.
+    """
     resp = make_request(url)
-    book_file = get_filepath(sanitize_filename(filename + '.txt'), folder)
-    with open(book_file, 'wb') as file:
+    with open(filepath, 'wb') as file:
         file.write(resp.content)
-    return str(book_file)
+    return filepath
+
+
+def get_filepath(filename: str, foldername: str) -> Path:
+    folder = Path(foldername)
+    folder.mkdir(exist_ok=True)
+    return folder.joinpath(filename)
 
 
 if __name__ == '__main__':
