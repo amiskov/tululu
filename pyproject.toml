@@ -1,10 +1,9 @@
 [tool.poetry]
-name = "books-library-restyle"
+name = "tululu"
 version = "0.1.0"
 description = ""
 authors = ["Andrey Miskov <amiskov@gmail.com>"]
 readme = "README.md"
-packages = [{include = "books_library_restyle"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
