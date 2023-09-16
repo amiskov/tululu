@@ -7,50 +7,63 @@ import requests
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
+logging.basicConfig(level=logging.INFO)
+
 
 def main():
     for book_id in range(1, 11):
-        # get title & author
-        resp = requests.get(f'https://tululu.org/b{book_id}/')
-        resp.raise_for_status()
+        txt_url = f'https://tululu.org/txt.php?id={book_id}'
+        page_url = f'https://tululu.org/b{book_id}/'
+
         try:
-            soup = BeautifulSoup(resp.text, 'lxml')
-            content = soup.find('div', {'id': 'content'})
+            resp = requests.get(page_url)
+            resp.raise_for_status()
+            check_for_redirect(resp)
+            book_details = parse_book_page(resp.text)
 
-            genres = []
-            genre_tags = content.find('span', class_='d_book').find_all('a')
-            for tag in genre_tags:
-                genres.append(tag.text)
+            saved_book_path = download_txt(
+                txt_url, f'{book_id}. {book_details["title"]}', 'books')
+            logging.info(f'{saved_book_path} has been saved.')
 
-            comments = []
-            comment_tags = content.find_all('div', class_='texts')
-            for tag in comment_tags:
-                comments.append(tag.find('span', class_='black').text)
-
-            h1 = content.find('h1').text
-            title, author = [part.strip() for part in h1.split('::')]
-
-            img_path = content.find('table', class_='d_book').find(
-                'div', class_='bookimage').find('img')['src']
-            img_url = f'https://tululu.org{img_path}'
-            download_image(img_url, 'images/')
-
-        except Exception as e:
-            logging.error(
-                f'Failed to find title and author for {book_id}: {e}')
-            continue
-
-        url = f'https://tululu.org/txt.php?id={book_id}'
-        try:
-            download_txt(url, f'{book_id}. {title}', 'books')
+            saved_img = download_image(book_details['cover_url'], 'images/')
+            logging.info(f'{saved_img} has been saved.')
         except requests.HTTPError as e:
             logging.error(e)
             continue
 
 
+def parse_book_page(page_html: str) -> dict:
+    soup = BeautifulSoup(page_html, 'lxml')
+    content = soup.find('div', {'id': 'content'})
+
+    h1 = content.find('h1').text
+    title, author = [part.strip() for part in h1.split('::')]
+
+    img_path = content.find('table', class_='d_book').find(
+        'div', class_='bookimage').find('img')['src']
+
+    genres = []
+    genre_tags = content.find('span', class_='d_book').find_all('a')
+    for genre_tag in genre_tags:
+        genres.append(genre_tag.text)
+
+    comments = []
+    comment_tags = content.find_all('div', class_='texts')
+    for comment_tag in comment_tags:
+        comments.append(comment_tag.find('span', class_='black').text)
+
+    return {
+        'title': title,
+        'author': author,
+        'cover_url': f'https://tululu.org{img_path}',
+        'genres': genres,
+        'comments': comments,
+    }
+
+
 def check_for_redirect(resp: requests.Response):
-    if resp.history and 'txt.php?id=' not in resp.url:
-        raise requests.HTTPError('Bad book URL.')
+    if resp.history:
+        raise requests.HTTPError('Redirect: initial URL has been changed.')
 
 
 def download_image(url: str, folder: str) -> str:
@@ -68,7 +81,6 @@ def download_image(url: str, folder: str) -> str:
 
     with open(image_file, 'wb') as file:
         file.write(response.content)
-    logging.info(f'{filename} has been saved.')
     return str(image_file)
 
 
@@ -106,7 +118,6 @@ def download_txt(url: str, filename: str, folder='books/') -> str:
 
     with open(book_file, 'wb') as file:
         file.write(response.content)
-    logging.info(f'{filename} has been saved.')
     return str(book_file)
 
 
