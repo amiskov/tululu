@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+import backoff
 import requests
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
@@ -13,6 +14,8 @@ LIBRARY_HOST = 'https://tululu.org'
 
 def main():
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger('backoff').addHandler(logging.StreamHandler())
+
     args = parse_args()
 
     books_count, saved_books_count = args.end_id - args.start_id + 1, 0
@@ -24,8 +27,8 @@ def main():
             saved_img = download_image(book_details['cover_url'], 'images/')
             logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
             saved_books_count += 1
-        except requests.RequestException as e:
-            logging.error(e)
+        except requests.HTTPError as e:
+            logging.error(f'Book {book_id} is not saved: {e}')
     logging.info(f'Done! Books saved: {saved_books_count} of {books_count}.')
 
 
@@ -45,6 +48,8 @@ def parse_args():
     return parser.parse_args()
 
 
+@backoff.on_exception(backoff.expo,
+                      (requests.ConnectionError, requests.Timeout))
 def make_request(url: str, params=None) -> requests.Response:
     """Return response of the request to the given `url`.
 
