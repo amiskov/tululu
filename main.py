@@ -8,6 +8,8 @@ import requests
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
+LIBRARY_HOST = 'https://tululu.org'
+
 
 def main():
     logging.basicConfig(level=logging.INFO)
@@ -15,16 +17,10 @@ def main():
 
     books_count, saved_books_count = args.end_id - args.start_id + 1, 0
     for book_id in range(args.start_id, args.end_id+1):
-        host = 'https://tululu.org'
-        page_url = f'{host}/b{book_id}/'
-        txt_url = f'{host}/txt.php?id={book_id}'
-
         try:
-            book_page_html = make_request(page_url).text
+            book_page_html = make_request(f'{LIBRARY_HOST}/b{book_id}/').text
             book_details = parse_book_page(book_page_html)
-            saved_book = download_txt(txt_url,
-                                      f'{book_id}. {book_details["title"]}',
-                                      'books/')
+            saved_book = download_txt(book_id, book_details["title"], 'books/')
             saved_img = download_image(book_details['cover_url'], 'images/')
             logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
             saved_books_count += 1
@@ -51,12 +47,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def make_request(url: str) -> requests.Response:
+def make_request(url: str, params=None) -> requests.Response:
     """Return response of the request to the given `url`.
 
     Fails if redirect happens.
     """
-    resp = requests.get(url, allow_redirects=False)
+    resp = requests.get(url, params=params, allow_redirects=False)
     resp.raise_for_status()
 
     # former `check_for_redirect` function
@@ -111,47 +107,39 @@ def download_image(url: str, folder: str) -> Path:
     """Save an image from `url` to the given `folder`."""
     image_name = get_filename_from_url(url)
     image_file = get_filepath(image_name, folder)
-    return download_to_file(url, image_file)
+    resp = make_request(url)
+    with open(image_file, 'wb') as file:
+        file.write(resp.content)
+    return image_file
 
 
-def download_txt(url: str, filename: str, folder='books/') -> Path:
+def download_txt(book_id: int, book_title: str, folder='books/') -> Path:
     """Download text content from the given `url`.
 
     Args:
-        url (str): link to text cntent.
-        filename (str): name of the file to store the text.
-        folder (str): desired directory name to store the file with text.
+        book_id (int): book ID to download.
+        book_title (str): the title of the book.
+        folder (str): desired directory name to store the book content.
 
     Returns:
-        str: path to created text file.
+        Path: path to created text file.
 
     Examples:
-        url = 'http://tululu.org/txt.php?id=1'
+        > download_txt(1, 'Алиби')
+        'books/1.Алиби.txt'
 
-        > download_txt(url, 'Алиби')
-        'books/Алиби.txt'
+        > download_txt(1, 'Али/би', folder='books/')
+        'books/1.Алиби.txt'
 
-        > download_txt(url, 'Али/би', folder='books/')
-        'books/Алиби.txt'
-
-        > download_txt(url, 'Али\\би', folder='txt/')
-        'txt/Алиби.txt'
+        > download_txt(1, 'Али\\би', folder='txt/')
+        'txt/1.Алиби.txt'
     """
-    correct_filename = sanitize_filename(filename + '.txt')
+    correct_filename = sanitize_filename(f'{book_id}.{book_title}' + '.txt')
     book_file = get_filepath(correct_filename, folder)
-    return download_to_file(url, book_file)
-
-
-def download_to_file(url: str, filepath: Path) -> Path:
-    """Save resource from `url` as a file to `filepath`.
-
-    Returns:
-        filepath (Path): path to file with content from `url`.
-    """
-    resp = make_request(url)
-    with open(filepath, 'wb') as file:
+    resp = make_request(f'{LIBRARY_HOST}/txt.php', {'id': book_id})
+    with open(book_file, 'wb') as file:
         file.write(resp.content)
-    return filepath
+    return book_file
 
 
 def get_filepath(filename: str, foldername: str) -> Path:
