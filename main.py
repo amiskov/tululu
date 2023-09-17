@@ -34,9 +34,18 @@ def main():
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(prog='Books Downloader')
-    parser.add_argument('start_id', type=int, nargs='?', default=1)
-    parser.add_argument('end_id', type=int, nargs='?', default=10)
+    desc = """
+    Download books from tululu.org in batches.
+    Use start_id and end_id to specify the beginning and the end of the
+    books range to download.
+    """
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument(
+        'start_id', type=int, nargs='?', default=1,
+        help='Book ID at the beginning of the downloading range.')
+    parser.add_argument(
+        'end_id', type=int, nargs='?', default=10,
+        help='Book ID at the end of the downloading range (included).')
     return parser.parse_args()
 
 
@@ -141,7 +150,7 @@ def download_txt(url: str, filename: str, folder='books/') -> Path:
 
 def download_to_file(url: str, filepath: Path) -> Path:
     """Save resource from `url` as a file to `filepath`.
-    
+
     Returns:
         filepath (Path): path to file with content from `url`.
     """
