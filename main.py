@@ -15,7 +15,9 @@ def main():
 
     books_count, saved_books_count = args.end_id - args.start_id + 1, 0
     for book_id in range(args.start_id, args.end_id+1):
-        page_url, txt_url = get_book_urls(book_id)
+        host = 'https://tululu.org'
+        page_url = f'{host}/b{book_id}/'
+        txt_url = f'{host}/txt.php?id={book_id}'
 
         try:
             book_page_html = make_request(page_url).text
@@ -62,14 +64,6 @@ def make_request(url: str) -> requests.Response:
         raise requests.HTTPError('Redirects not allowed.')
 
     return resp
-
-
-def get_book_urls(book_id: int) -> tuple[str, str]:
-    """Return 2 urls: book description page and downloadable txt."""
-    host = 'https://tululu.org'
-    txt_url = f'{host}/txt.php?id={book_id}'
-    page_url = f'{host}/b{book_id}/'
-    return page_url, txt_url
 
 
 def parse_book_page(page_html: str) -> dict:
