@@ -52,11 +52,11 @@ def make_request(url: str, params=None) -> requests.Response:
 
     Fails if redirect happens.
     """
-    resp = requests.get(url, params=params, allow_redirects=False)
+    resp = requests.get(url, params=params)
     resp.raise_for_status()
 
     # former `check_for_redirect` function
-    if 300 <= resp.status_code < 400:
+    if resp.history:
         raise requests.HTTPError('Redirects not allowed.')
 
     return resp
