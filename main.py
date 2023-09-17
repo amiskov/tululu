@@ -26,8 +26,6 @@ def main():
             saved_books_count += 1
         except requests.RequestException as e:
             logging.error(e)
-        finally:
-            continue
     logging.info(f'Done! Books saved: {saved_books_count} of {books_count}.')
 
 
