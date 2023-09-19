@@ -108,12 +108,12 @@ def get_filename_from_url(url: str) -> str:
 
 def download_image(url: str, folder: str) -> Path:
     """Save an image from `url` to the given `folder`."""
-    image_name = get_filename_from_url(url)
-    image_file = get_filepath(image_name, folder)
+    image_filename = get_filename_from_url(url)
+    image_path = get_filepath(image_filename, folder)
     resp = make_request(url)
-    with open(image_file, 'wb') as file:
-        file.write(resp.content)
-    return image_file
+    with open(image_path, 'wb') as image:
+        image.write(resp.content)
+    return image_path
 
 
 def download_txt(book_id: int, book_title: str, folder='books/') -> Path:
@@ -137,12 +137,12 @@ def download_txt(book_id: int, book_title: str, folder='books/') -> Path:
         > download_txt(1, 'Али\\би', folder='txt/')
         'txt/1.Алиби.txt'
     """
-    correct_filename = sanitize_filename(f'{book_id}.{book_title}' + '.txt')
-    book_file = get_filepath(correct_filename, folder)
+    book_filename = sanitize_filename(f'{book_id}.{book_title}' + '.txt')
+    book_path = get_filepath(book_filename, folder)
     resp = make_request(f'{LIBRARY_HOST}/txt.php', {'id': book_id})
-    with open(book_file, 'wb') as file:
-        file.write(resp.content)
-    return book_file
+    with open(book_path, 'wb') as book:
+        book.write(resp.content)
+    return book_path
 
 
 def get_filepath(filename: str, foldername: str) -> Path:
