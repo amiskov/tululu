@@ -31,6 +31,8 @@ def download_txt(base_url: str, book_id: int, book_title: str, folder='books/') 
     """
     book_filename = sanitize_filename(f'{book_id}.{book_title}' + '.txt')
     book_path = get_filepath(book_filename, folder)
+    if book_path.is_file(): # book already exists
+        return book_path
     resp = make_request(base_url, {'id': book_id})
     with open(book_path, 'wb') as book:
         book.write(resp.content)
@@ -41,6 +43,10 @@ def download_image(url: str, folder: str) -> Path:
     """Save an image from `url` to the given `folder`."""
     image_filename = get_filename_from_url(url)
     image_path = get_filepath(image_filename, folder)
+
+    if image_path.is_file(): # image already exists
+        return image_path
+
     resp = make_request(url)
     with open(image_path, 'wb') as image:
         image.write(resp.content)
@@ -50,28 +56,31 @@ def download_image(url: str, folder: str) -> Path:
 def parse_book_page(page_html: str) -> dict:
     """Extract book details from HTML soup."""
     soup = BeautifulSoup(page_html, 'lxml')
-    content = soup.find('div', {'id': 'content'})
+    content = soup.select_one('div#content')
 
-    h1 = content.find('h1').text
+    if not content:
+        raise ValueError('HTML unparseable.')
+
+    h1 = content.select_one('h1').text
     title, author = [part.strip() for part in h1.split('::')]
 
-    img_src = content.find('table', class_='d_book').find(
-        'div', class_='bookimage').find('img')['src']
+    cover = content.select_one('table.d_book div.bookimage img')
 
     genres = []
-    genre_tags = content.find('span', class_='d_book').find_all('a')
+    genre = content.select_one('span.d_book')
+    genre_tags = genre.select('a')
     for genre_tag in genre_tags:
         genres.append(genre_tag.text)
 
     comments = []
-    comment_tags = content.find_all('div', class_='texts')
+    comment_tags = content.select('div.texts')
     for comment_tag in comment_tags:
-        comments.append(comment_tag.find('span', class_='black').text)
+        comments.append(comment_tag.select_one('span.black').text)
 
     return {
         'title': title,
         'author': author,
-        'img_src': img_src,
+        'img_src': cover['src'] if cover else '',
         'genres': genres,
         'comments': comments,
     }

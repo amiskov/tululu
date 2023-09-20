@@ -19,21 +19,32 @@ def main():
 
     args = parse_args()
 
-    books_count, saved_books_count = args.end_id - args.start_id + 1, 0
-    for book_id in range(args.start_id, args.end_id+1):
+    category_base_url = urljoin(LIBRARY_HOST, f'l{CATEGORY_ID}')
+    category_books = get_category_links(category_base_url, 1, 1)
+    print(category_books)
+
+    saved_books_count = 0
+    books_meta = []
+    for book_id in category_books:
         try:
             book_page_html = make_request(f'{LIBRARY_HOST}/b{book_id}/').text
             book_details = parse_book_page(book_page_html)
-            saved_book = download_txt(LIBRARY_HOST, book_id, book_details["title"], 'books/')
+
+            saved_book = download_txt(
+                f'{LIBRARY_HOST}/txt.php', int(book_id), book_details["title"], 'books/')
             img_url = f'{LIBRARY_HOST}/{book_details["img_src"]}'
             saved_img = download_image(img_url, 'images/')
             logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
+
+            books_meta.append(book_details)
+
             saved_books_count += 1
         except requests.HTTPError as e:
             logging.error(f'Book {book_id} is not saved: {e}')
 
-    logging.info(f'Done! Books saved: {saved_books_count} of {books_count}.')
-
+    with open("books.json", "w") as books:
+        json.dump(books_meta, books, ensure_ascii=False)
+    logging.info(f'Done! {saved_books_count} saved.')
 
 
 
