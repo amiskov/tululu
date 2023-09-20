@@ -1,15 +1,16 @@
 import argparse
+import json
 import logging
-import os
-from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import urljoin
 
-import backoff
 import requests
-from bs4 import BeautifulSoup
-from pathvalidate import sanitize_filename
+
+from book import download_image, download_txt, parse_book_page
+from category import get_category_links
+from fetch import make_request
 
 LIBRARY_HOST = 'https://tululu.org'
+CATEGORY_ID = 55
 
 
 def main():
@@ -18,18 +19,33 @@ def main():
 
     args = parse_args()
 
-    books_count, saved_books_count = args.end_id - args.start_id + 1, 0
-    for book_id in range(args.start_id, args.end_id+1):
+    category_base_url = urljoin(LIBRARY_HOST, f'l{CATEGORY_ID}')
+    category_books = get_category_links(category_base_url, 1, 2)
+    print(category_books)
+
+    saved_books_count = 0
+    books_meta = []
+    for book_id in category_books:
         try:
             book_page_html = make_request(f'{LIBRARY_HOST}/b{book_id}/').text
             book_details = parse_book_page(book_page_html)
-            saved_book = download_txt(book_id, book_details["title"], 'books/')
-            saved_img = download_image(book_details['cover_url'], 'images/')
+
+            saved_book = download_txt(
+                f'{LIBRARY_HOST}/txt.php', int(book_id), book_details["title"], 'books/')
+            img_url = f'{LIBRARY_HOST}/{book_details["img_src"]}'
+            saved_img = download_image(img_url, 'images/')
             logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
+
+            books_meta.append(book_details)
+
             saved_books_count += 1
         except requests.HTTPError as e:
             logging.error(f'Book {book_id} is not saved: {e}')
-    logging.info(f'Done! Books saved: {saved_books_count} of {books_count}.')
+
+    with open("books.json", "w") as books:
+        json.dump(books_meta, books, ensure_ascii=False)
+    logging.info(f'Done! {saved_books_count} saved.')
+
 
 
 def parse_args():
@@ -46,109 +62,6 @@ def parse_args():
         'end_id', type=int, nargs='?', default=10,
         help='Book ID at the end of the downloading range (included).')
     return parser.parse_args()
-
-
-@backoff.on_exception(backoff.expo,
-                      (requests.ConnectionError, requests.Timeout))
-def make_request(url: str, params=None) -> requests.Response:
-    """Return response of the request to the given `url`.
-
-    Fails if redirect happens.
-    """
-    resp = requests.get(url, params=params)
-    resp.raise_for_status()
-
-    # former `check_for_redirect` function
-    if resp.history:
-        raise requests.HTTPError('Redirects not allowed.')
-
-    return resp
-
-
-def parse_book_page(page_html: str) -> dict:
-    """Extract book details from HTML soup."""
-    soup = BeautifulSoup(page_html, 'lxml')
-    content = soup.find('div', {'id': 'content'})
-
-    h1 = content.find('h1').text
-    title, author = [part.strip() for part in h1.split('::')]
-
-    img_path = content.find('table', class_='d_book').find(
-        'div', class_='bookimage').find('img')['src']
-
-    genres = []
-    genre_tags = content.find('span', class_='d_book').find_all('a')
-    for genre_tag in genre_tags:
-        genres.append(genre_tag.text)
-
-    comments = []
-    comment_tags = content.find_all('div', class_='texts')
-    for comment_tag in comment_tags:
-        comments.append(comment_tag.find('span', class_='black').text)
-
-    return {
-        'title': title,
-        'author': author,
-        'cover_url': f'https://tululu.org{img_path}',
-        'genres': genres,
-        'comments': comments,
-    }
-
-
-def get_filename_from_url(url: str) -> str:
-    """Return filename with extension from `url`.
-
-    >>> get_filename_from_url('https://example.com/images/test.png')
-    'test.png'
-    """
-    url_path = urlsplit(url).path
-    _, filename = os.path.split(unquote(url_path))
-    return filename
-
-
-def download_image(url: str, folder: str) -> Path:
-    """Save an image from `url` to the given `folder`."""
-    image_filename = get_filename_from_url(url)
-    image_path = get_filepath(image_filename, folder)
-    resp = make_request(url)
-    with open(image_path, 'wb') as image:
-        image.write(resp.content)
-    return image_path
-
-
-def download_txt(book_id: int, book_title: str, folder='books/') -> Path:
-    """Download text content from the given `url`.
-
-    Args:
-        book_id (int): book ID to download.
-        book_title (str): the title of the book.
-        folder (str): desired directory name to store the book content.
-
-    Returns:
-        Path: path to created text file.
-
-    Examples:
-        > download_txt(1, 'Алиби')
-        'books/1.Алиби.txt'
-
-        > download_txt(1, 'Али/би', folder='books/')
-        'books/1.Алиби.txt'
-
-        > download_txt(1, 'Али\\би', folder='txt/')
-        'txt/1.Алиби.txt'
-    """
-    book_filename = sanitize_filename(f'{book_id}.{book_title}' + '.txt')
-    book_path = get_filepath(book_filename, folder)
-    resp = make_request(f'{LIBRARY_HOST}/txt.php', {'id': book_id})
-    with open(book_path, 'wb') as book:
-        book.write(resp.content)
-    return book_path
-
-
-def get_filepath(filename: str, foldername: str) -> Path:
-    folder = Path(foldername)
-    folder.mkdir(exist_ok=True)
-    return folder.joinpath(filename)
 
 
 if __name__ == '__main__':
