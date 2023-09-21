@@ -1,16 +1,12 @@
 import argparse
-import json
 import logging
-from urllib.parse import urljoin
 
 import requests
 
 from book import download_image, download_txt, parse_book_page
-from category import get_book_ids
 from utils import make_request
 
 LIBRARY_HOST = 'https://tululu.org'
-CATEGORY_ID = 55
 
 
 def main():
@@ -24,7 +20,8 @@ def main():
         try:
             book_page_html = make_request(f'{LIBRARY_HOST}/b{book_id}/').text
             book_details = parse_book_page(book_page_html)
-            saved_book = download_txt(LIBRARY_HOST, book_id, book_details["title"], 'books/')
+            saved_book = download_txt(
+                LIBRARY_HOST, book_id, book_details["title"], 'books/')
             img_url = f'{LIBRARY_HOST}/{book_details["img_src"]}'
             saved_img = download_image(img_url, 'images/')
             logging.info(f'Book saved to {saved_book} with cover {saved_img}.')
@@ -33,8 +30,6 @@ def main():
             logging.error(f'Book {book_id} is not saved: {e}')
 
     logging.info(f'Done! Books saved: {saved_books_count} of {books_count}.')
-
-
 
 
 def parse_args():
