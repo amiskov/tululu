@@ -1,11 +1,9 @@
 from pathlib import Path
-import os
-from urllib.parse import unquote, urlsplit
 
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
-from fetch import make_request
+from utils import make_request, get_filepath, get_filename_from_url
 
 
 def download_txt(base_url: str, book_id: int, book_title: str, folder='books/') -> Path:
@@ -31,7 +29,7 @@ def download_txt(base_url: str, book_id: int, book_title: str, folder='books/') 
     """
     book_filename = sanitize_filename(f'{book_id}.{book_title}' + '.txt')
     book_path = get_filepath(book_filename, folder)
-    if book_path.is_file(): # book already exists
+    if book_path.is_file():  # book already exists
         return book_path
     resp = make_request(base_url, {'id': book_id})
     with open(book_path, 'wb') as book:
@@ -44,7 +42,7 @@ def download_image(url: str, folder: str) -> Path:
     image_filename = get_filename_from_url(url)
     image_path = get_filepath(image_filename, folder)
 
-    if image_path.is_file(): # image already exists
+    if image_path.is_file():  # image already exists
         return image_path
 
     resp = make_request(url)
@@ -61,16 +59,21 @@ def parse_book_page(page_html: str) -> dict:
     if not content:
         raise ValueError('HTML unparseable.')
 
-    h1 = content.select_one('h1').text
-    title, author = [part.strip() for part in h1.split('::')]
+    title, author = '', ''
+    h1 = content.select_one('h1')
+    if h1:
+        title, author = [part.strip() for part in h1.text.split('::')]
 
+    img_src = ''
     cover = content.select_one('table.d_book div.bookimage img')
+    if cover:
+        img_src = cover['src']
 
     genres = []
     genre = content.select_one('span.d_book')
-    genre_tags = genre.select('a')
-    for genre_tag in genre_tags:
-        genres.append(genre_tag.text)
+    if genre:
+        for genre_link in genre.select('a'):
+            genres.append(genre_link.text)
 
     comments = []
     comment_tags = content.select('div.texts')
@@ -80,24 +83,7 @@ def parse_book_page(page_html: str) -> dict:
     return {
         'title': title,
         'author': author,
-        'img_src': cover['src'] if cover else '',
+        'img_src': img_src,
         'genres': genres,
         'comments': comments,
     }
-
-
-def get_filename_from_url(url: str) -> str:
-    """Return filename with extension from `url`.
-
-    >>> get_filename_from_url('https://example.com/images/test.png')
-    'test.png'
-    """
-    url_path = urlsplit(url).path
-    _, filename = os.path.split(unquote(url_path))
-    return filename
-
-
-def get_filepath(filename: str, foldername: str) -> Path:
-    folder = Path(foldername)
-    folder.mkdir(exist_ok=True)
-    return folder.joinpath(filename)

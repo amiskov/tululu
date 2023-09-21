@@ -3,7 +3,7 @@ import logging
 from bs4 import BeautifulSoup
 import requests
 
-from fetch import make_request
+from utils import make_request
 
 
 def get_last_pagenum(category_base_url: str) -> int:
@@ -39,7 +39,7 @@ def get_book_ids(category_base_url: str, start_page: int, end_page: int) -> list
             book_link_tags = content.select('table.d_book tr td .bookimage a')
             page_books = [link['href'][2:-1] for link in book_link_tags]
             category_books.extend(page_books)
-            print(f'Added {len(page_books)} book links.')
+            print(f'Found {len(page_books)} books in {category_base_url}.')
         except requests.HTTPError:
             logging.error(f'page {page} not found')
     return category_books

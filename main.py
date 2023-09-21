@@ -7,7 +7,7 @@ import requests
 
 from book import download_image, download_txt, parse_book_page
 from category import get_book_ids
-from fetch import make_request
+from utils import make_request
 
 LIBRARY_HOST = 'https://tululu.org'
 CATEGORY_ID = 55
