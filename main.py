@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 import requests
 
 from book import download_image, download_txt, parse_book_page
-from category import get_category_links
+from category import get_book_ids
 from fetch import make_request
 
 LIBRARY_HOST = 'https://tululu.org'

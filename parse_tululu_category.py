@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 import requests
 
 from book import download_image, download_txt, parse_book_page
-from category import get_category_links
+from category import get_book_ids, get_last_pagenum
 from fetch import make_request
 
 LIBRARY_HOST = 'https://tululu.org'
@@ -20,12 +20,17 @@ def main():
     args = parse_args()
 
     category_base_url = urljoin(LIBRARY_HOST, f'l{CATEGORY_ID}')
-    category_books = get_category_links(category_base_url, 1, 1)
-    print(category_books)
+
+    end_page = get_last_pagenum(category_base_url)
+    if args.end_page:
+        end_page = min(args.end_page, end_page)
+
+    book_ids = get_book_ids(category_base_url, start_page=args.start_page,
+                            end_page=end_page)
 
     saved_books_count = 0
     books_meta = []
-    for book_id in category_books:
+    for book_id in book_ids:
         try:
             book_page_html = make_request(f'{LIBRARY_HOST}/b{book_id}/').text
             book_details = parse_book_page(book_page_html)
@@ -47,20 +52,15 @@ def main():
     logging.info(f'Done! {saved_books_count} saved.')
 
 
-
 def parse_args():
     desc = """
-    Download books from tululu.org in batches.
-    Use start_id and end_id to specify the beginning and the end of the
-    books range to download.
+    Fetch books from the 'Science finction' category.
     """
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument(
-        'start_id', type=int, nargs='?', default=1,
-        help='Book ID at the beginning of the downloading range.')
-    parser.add_argument(
-        'end_id', type=int, nargs='?', default=10,
-        help='Book ID at the end of the downloading range (included).')
+    parser.add_argument('--start_page', type=int, default=1,
+                        help='Category page to start saving books.')
+    parser.add_argument('--end_page', type=int,
+                        help='Category page to stop saving books (not included).')
     return parser.parse_args()
 
 

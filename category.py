@@ -6,11 +6,25 @@ import requests
 from fetch import make_request
 
 
-def get_category_links(category_base_url: str, start_page: int = 1, end_page: int = 10) -> list[str]:
+def get_last_pagenum(category_base_url: str) -> int:
+    """
+    Returns:
+        The last page number from category pagination or 1 if pagination not found.
+    """
+    page_html = make_request(f'{category_base_url}/1')
+    soup = BeautifulSoup(page_html.text, 'lxml')
+    last_page_tag = soup.select_one('div#content p:last-child a:last-child')
+    if not last_page_tag:
+        return 1
+    total_pages = int(last_page_tag.getText())
+    logging.info(f'Category has {total_pages} pages in total.')
+    return total_pages
+
+
+def get_book_ids(category_base_url: str, start_page: int, end_page: int) -> list[str]:
     """Return list of book links from the given category."""
-    # total_pages = 0
     category_books = []
-    for page in range(start_page, end_page+1):
+    for page in range(start_page, end_page):
         try:
             page_url = f'{category_base_url}/{page}'
             logging.info(f'fetching {page_url}...')
@@ -21,12 +35,6 @@ def get_category_links(category_base_url: str, start_page: int = 1, end_page: in
             if not content:
                 logging.error(f'Category HTML not found in {page_url}')
                 continue
-
-            # if not total_pages:
-            #     paging = content.select_one('div#content p:last-child a:last-child')
-            #     if not paging:
-            #         return 'Paging not found'
-            #     total_pages = int(paging.getText())
 
             book_link_tags = content.select('table.d_book tr td .bookimage a')
             page_books = [link['href'][2:-1] for link in book_link_tags]
