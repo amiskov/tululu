@@ -28,6 +28,10 @@ def get_filename_from_url(url: str) -> str:
 
     >>> get_filename_from_url('https://example.com/images/test.png')
     'test.png'
+    >>> get_filename_from_url('/images/test.png')
+    'test.png'
+    >>> get_filename_from_url('/shots/test.png')
+    'test.png'
     """
     url_path = urlsplit(url).path
     _, filename = os.path.split(unquote(url_path))

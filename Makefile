@@ -7,4 +7,6 @@ runcat:
 repl:
 	poetry run ipython
 test:
-	poetry run python -m doctest parse_tululu_books.py
+	poetry run python -m doctest utils.py
+serve:
+	poetry run python render_website.py
