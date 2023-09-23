@@ -10,3 +10,5 @@ test:
 	poetry run python -m doctest utils.py
 serve:
 	poetry run python render_website.py
+deploy:
+	sh deploy.sh

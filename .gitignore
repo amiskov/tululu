@@ -3,6 +3,7 @@ images/
 books.json
 index.html
 pages/
+public/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
