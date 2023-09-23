@@ -43,12 +43,13 @@ def main():
                                           book_details["title"],
                                           f'{dest_folder}/books/')
                 logging.info(f'Text saved to {saved_book}.')
+                book_details['book_filepath'] = str(saved_book)
 
             if not args.skip_imgs:
                 img_url = f'{LIBRARY_HOST}/{book_details["img_src"]}'
                 saved_img = download_image(img_url, f'{dest_folder}/images/')
                 logging.info(f'Cover saved to {saved_img}.')
-                book_details['img_src'] = str(saved_img)
+                book_details['img_filepath'] = str(saved_img)
 
             books_meta.append(book_details)
 
