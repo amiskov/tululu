@@ -48,6 +48,7 @@ def main():
                 img_url = f'{LIBRARY_HOST}/{book_details["img_src"]}'
                 saved_img = download_image(img_url, f'{dest_folder}/images/')
                 logging.info(f'Cover saved to {saved_img}.')
+                book_details['img_src'] = str(saved_img)
 
             books_meta.append(book_details)
 
