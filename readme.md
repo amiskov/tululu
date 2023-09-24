@@ -1,5 +1,7 @@
-# Download Books
-There are a couple of scripts to download books from [tululu](https://tululu.org) library. You can download arbitrary books by IDs or in batches from 'Science Fiction' category.
+# Offline SciFi Library
+Scripts to download SciFi books from [tululu](https://tululu.org) and create an offline library.
+
+You can download arbitrary books by IDs or in batches from 'Science Fiction' category. Also, you can render HTML-pages with book titles, covers etc. making your own offline library and re-publish it to GitHub pages with a single command.
 
 ## Install
 Add deps using [Poetry](https://python-poetry.org):
@@ -31,7 +33,7 @@ poetry run python parse_tululu_category.py -h
 By default, book texts, covers and metadata will be saved to the current directory. Texts to `books/` folder, covers to `images/` and metadata to `books.json` file. Books metadata includes book's title, author, cover, genres and comments. If you want to store the data elsewhere, use `--dest_folder` to specify the desired folder:
 
 ```sh
-poetry run python parse_tululu_category.py --dest_folder my_scify_books
+poetry run python parse_tululu_category.py --dest_folder my_scifi_books
 ```
 
 There are a lot of books in 'Science Fiction' category. If you don't need all of them, you can specify only the desired range of pages using `--start_page` and `--end_age` options. E.g. this command will fetch books texts, covers and metadata from pages 1 and 2:
@@ -58,3 +60,36 @@ To download all the books with texts, covers and metadata from the 'Science Fict
 ```sh
 poetry run python parse_tululu_category.py
 ```
+
+## Create Offline-based Website
+This command will create static HTML-pages with pagination for downloaded books:
+
+```sh
+poetry run python render_website.py
+cd pages/ # see a bunch of `.html` pages here
+```
+
+For develpoment, run it in serving mode and change the `template.html` file as you need:
+
+```sh
+poetry run python render_website.py --serve
+```
+
+This will fire up a webserver in livereload mode, so you can change the design and have rendered HTML pages on the fly.
+
+## Deploy to GitHub Pages
+If you need books to be published online, run `deploy.sh` script. It will publish rendered HTML-pages to the `gh-pages` branch of your repo. Make sure to change the address of a GitHub repo and create `gh-pages` branch:
+
+```sh
+# Create `gh-pages` branch for publishing your library
+git checkout --orphan gh-pages
+echo "Hello, GitHub Pages!" > readme.md
+git add readme.md
+git commit -m "init gh-pages branch"
+git push --set-upstream origin gh-pages
+
+# Publish your library:
+sh deploy.sh
+```
+
+Check `https://<YOUR-USERNAME>.github.io/tululu/pages/index1.html` URL.
