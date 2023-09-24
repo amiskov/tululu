@@ -1,6 +1,7 @@
-import os
-import math
+import argparse
 import json
+import math
+import os
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from livereload import Server
@@ -31,12 +32,23 @@ def on_reload(db_filename: str, target_dir: str):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--serve', action='store_true',
+                        help='Run development server, refresh pages on template change.')
+    args = parser.parse_args()
+
     target_dir = 'pages'
     os.makedirs(target_dir, exist_ok=True)
-    server = Server()
+
+    # Render pges once
     on_reload('books.json', target_dir)
-    server.watch('template.html', lambda: on_reload('books.json', target_dir), delay='forever')
-    server.serve(root='.')
+
+    # Run the server and render pages on template change
+    if args.serve:
+        server = Server()
+        server.watch('template.html', lambda: on_reload(
+            'books.json', target_dir), delay='forever')
+        server.serve(root='.')
 
 
 if __name__ == '__main__':
